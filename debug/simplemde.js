@@ -15585,17 +15585,62 @@ function cleanBlock(editor) {
  * Action for drawing a link.
  */
 function drawLink(editor) {
+	/* global jQuery */
+	var options = editor.options;
+	if(options.promptURLs) {
+		//Call to the modal if exists
+		var modal = window.modal;
+		if(typeof modal != "undefined") {
+			modal.open({
+				content: "<label>Link copy: <input type=\"text\" name=\"link\" id=\"link-copy\"/> </label>" +
+					"<label>Link url: <input type=\"text\" name=\"link\" id=\"link-autocomplete\"/></label>" +
+					" <button id=\"callbackTrigger\">Add</button>",
+				load: function() {
+					jQuery("#link-autocomplete").autocomplete({
+						serviceUrl: "/admin/markdown/internallinks",
+						dataType: "json",
+						minChars: 4,
+						paramName: "term",
+						onSelect: function(suggestion) {
+							if(jQuery("#link-copy").val() == "") {
+								jQuery("#link-copy").val(suggestion.data);
+							}
+						},
+						transformResult: function(response) {
+							var suggestions = {
+								suggestions: jQuery.map(response, function(dataItem) {
+									return {
+										value: dataItem.url_segment + ":" + dataItem.id,
+										data: dataItem.title
+									};
+								})
+							};
+							return suggestions;
+						}
+					});
+				},
+				callback: linkCallback,
+				editor: editor,
+				modalInstance: modal,
+				callbackTrigger: "#callbackTrigger",
+				callbackData: "#link-copy, #link-autocomplete"
+			});
+		}
+	}
+}
+
+function linkCallback(editor, url, modal) {
 	var cm = editor.codemirror;
 	var stat = getState(cm);
 	var options = editor.options;
-	var url = "http://";
-	if(options.promptURLs) {
-		url = prompt(options.promptTexts.link);
-		if(!url) {
-			return false;
-		}
+
+	if(url.length == 2) {
+		_replaceSelection(cm, stat.link, options.insertTexts.link, url[1]);
+		cm.getSelection();
+		cm.replaceSelection(url[0]);
 	}
-	_replaceSelection(cm, stat.link, options.insertTexts.link, url);
+
+	modal.close();
 }
 
 /**
